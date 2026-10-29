@@ -268,7 +268,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -311,7 +311,11 @@ protected:
     /// parameter of a `nonisolated(nonsending)` call and doesn't leave isolation of
     /// the parent context. It's easier to work with statically known isolation than
     /// make closure dynamically isolated via assuming `nonisolated(nonsending)`.
-    BehavesLikeNonisolatedNonsending: 1
+    BehavesLikeNonisolatedNonsending: 1,
+
+    /// True if this is the operation closure which pre-checking synthesizes
+    /// for the operand of a 'send'
+    IsSendOperation : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -354,12 +358,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
-    ShouldApplyDistributedThunk : 1
+    ShouldApplyDistributedThunk : 1,
+    IsSendOperand : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -2216,6 +2221,12 @@ public:
 /// SendExpr - A 'send' surrounding a Void-returning, non-throwing call,
 /// marking that the call should be dispatched fire-and-forget rather than
 /// awaited
+///
+/// Pre-checking wraps the call in an implicit '{ try await <call> }' operation
+/// closure of type '() async throws -> Void', which SILGen runs in a new
+/// discarding task. CSApply replaces the closure with a synchronous
+/// expression for a synchronous callee which is isolated to an actor, which
+/// enqueues the call
 class SendExpr final : public Expr {
   Expr *SubExpr;
   SourceLoc SendLoc;
@@ -4379,6 +4390,7 @@ public:
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = false;
+    Bits.ClosureExpr.IsSendOperation = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4502,6 +4514,14 @@ public:
 
   void setBehavesLikeNonisolatedNonsending(bool value = true) {
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = value;
+  }
+
+  /// Whether this is the operation closure which pre-checking synthesizes for
+  /// the operand of a 'send', whose body is the user's call
+  bool isSendOperation() const { return Bits.ClosureExpr.IsSendOperation; }
+
+  void setIsSendOperation(bool value = true) {
+    Bits.ClosureExpr.IsSendOperation = value;
   }
 
   /// Determine whether this closure expression has an
@@ -5044,6 +5064,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
     Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
+    Bits.ApplyExpr.IsSendOperand = false;
   }
 
 public:
@@ -5159,6 +5180,13 @@ public:
   }
   void setShouldApplyDistributedThunk(bool flag) {
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
+  }
+
+  /// Whether this call is the operand of a 'send', e.g. the 'x.f()' in
+  /// 'send x.f()'
+  bool isSendOperand() const { return Bits.ApplyExpr.IsSendOperand; }
+  void setIsSendOperand(bool flag = true) {
+    Bits.ApplyExpr.IsSendOperand = flag;
   }
 
   ValueDecl *getCalledValue(bool skipFunctionConversions = false) const;
