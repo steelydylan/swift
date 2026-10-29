@@ -8086,6 +8086,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind, rawExecutionSemantics;
   bool noescape = false, sendable, async, throws, hasSendingResult, coro;
+  bool oneway = false;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -8095,13 +8096,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult, rawExecutionSemantics, coro);
+        hasSendingResult, rawExecutionSemantics, coro, oneway);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
         thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
-        rawExecutionSemantics, coro, rawGenericSig);
+        rawExecutionSemantics, coro, oneway, rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -8163,6 +8164,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
           .withSendable(sendable)
           .withAsync(async)
           .withCoroutine(coro)
+          .withOneway(oneway)
           .build();
 
   auto resultTy = MF.getTypeChecked(resultID);

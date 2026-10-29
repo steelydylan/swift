@@ -196,6 +196,12 @@ public:
       FunctionMetadataDifferentiabilityKind diffKind, Type globalActor,
       Type thrownError);
 
+  /// Apply the AST-only '@oneway' flag to a function type built
+  /// by \c createFunctionType. '@oneway' is not representable in runtime
+  /// metadata, so \c TypeDecoder only calls this for builders that provide
+  /// it (see \c BuilderModelsOnewayFunctionTypes).
+  Type createOnewayFunctionType(Type functionType);
+
   Type createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
       Demangle::ImplCoroutineKind coroutineKind,

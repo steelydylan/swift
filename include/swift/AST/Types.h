@@ -420,7 +420,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 19 };
+  enum { NumAFTExtInfoBits = 20 };
   enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
@@ -4058,6 +4058,8 @@ public:
   bool isSendable() const;
 
   bool isAsync() const { return getExtInfo().isAsync(); }
+
+  bool isOneway() const { return getExtInfo().isOneway(); }
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 

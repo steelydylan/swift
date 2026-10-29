@@ -712,7 +712,7 @@ EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
 /// Builtin.createSynchronousDiscardingTask
 LANGUAGE_FEATURE(BuiltinCreateSynchronousDiscardingTask, 0, "Builtin.createSynchronousDiscardingTask")
 
-/// The 'send' fire-and-forget call expression.
+/// The 'send' fire-and-forget call expression and associated @oneway and @oneway(never) attributes.
 EXPERIMENTAL_FEATURE(SendCalls, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE

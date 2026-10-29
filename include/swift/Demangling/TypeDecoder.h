@@ -36,6 +36,8 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <optional>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace swift {
@@ -689,6 +691,27 @@ getEscapingSwiftFunctionNodeKind(FunctionMetadataExecutionSemantics semantics) {
 
 #define MAKE_NODE_TYPE_ERROR0(Node, Str) MAKE_NODE_TYPE_ERROR(Node, "%s", Str)
 
+/// Detects whether a type decoder builder models the AST-only
+/// '@oneway' function type flavor, by providing
+/// \c createOnewayFunctionType(BuiltType).
+///
+/// '@oneway' is not part of runtime metadata (runtime and reflection
+/// manglings never contain it), so only builders that reconstruct AST types,
+/// such as the ASTBuilder used for debugger type reconstruction, need to
+/// implement this. Other builders (the runtime's metadata builder,
+/// RemoteInspection's TypeRefBuilder) simply drop it.
+template <typename BuilderType, typename = void>
+struct BuilderModelsOnewayFunctionTypes : std::false_type {};
+
+template <typename BuilderType>
+struct BuilderModelsOnewayFunctionTypes<
+    BuilderType,
+    std::void_t<decltype(std::declval<BuilderType &>()
+                             .createOnewayFunctionType(
+                                 std::declval<
+                                     typename BuilderType::BuiltType>()))>>
+    : std::true_type {};
+
 /// Decode a mangled type to construct an abstract type, forming such
 /// types by invoking a custom builder.
 template <typename BuilderType>
@@ -1172,6 +1195,18 @@ protected:
         ++firstChildIdx;
       }
 
+      // '@oneway' is an AST-only function flavor. It
+      // is not represented in runtime metadata flags, since SIL lowering
+      // drops it. Only builders that model it (see
+      // BuilderModelsOnewayFunctionTypes) are told about it, everyone
+      // else just skips the annotation node
+      bool isOneway = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::OnewayFunctionType) {
+        isOneway = true;
+        ++firstChildIdx;
+      }
+
       bool isAsync = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::AsyncAnnotation) {
@@ -1231,9 +1266,17 @@ protected:
       if (extFlags != ExtendedFunctionTypeFlags())
         flags = flags.withExtendedFlags(true);
 
-      return Builder.createFunctionType(
-          parameters, result.getType(), flags, extFlags, diffKind, globalActorType,
-          thrownErrorType);
+      auto functionType = Builder.createFunctionType(
+          parameters, result.getType(), flags, extFlags, diffKind,
+          globalActorType, thrownErrorType);
+      if constexpr (BuilderModelsOnewayFunctionTypes<
+                        BuilderType>::value) {
+        if (isOneway && functionType)
+          return Builder.createOnewayFunctionType(functionType);
+      } else {
+        (void)isOneway;
+      }
+      return functionType;
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;

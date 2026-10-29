@@ -430,6 +430,12 @@ $s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Floa
 $s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
+$s9OnewayLib4pingyyYoF ---> OnewayLib.ping @oneway () -> ()
+$s9OnewayLib6WorkerC3logyySSYaYoF ---> OnewayLib.Worker.log @oneway (Swift.String) async -> ()
+$s9OnewayLib7genericyyxYolF ---> OnewayLib.generic<A> @oneway (A) -> ()
+$s9OnewayLib8registeryyyyYocF ---> OnewayLib.register(@oneway () -> ()) -> ()
+$s9OnewayLib13takesSendableyyyyYaYoYbcF ---> OnewayLib.takesSendable(@Sendable @oneway () async -> ()) -> ()
+$s9OnewayLib6HolderV8callbackyyYocvg ---> OnewayLib.Holder.callback.getter : @oneway () -> ()
 $SSSTf4pd44444_n ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444]> of Swift.String
 $sScA ---> Swift.Actor
 $sScGySiG ---> Swift.TaskGroup<Swift.Int>

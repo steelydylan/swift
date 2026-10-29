@@ -538,6 +538,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ConcurrentFunctionType:
+    case Node::Kind::OnewayFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
@@ -932,6 +933,12 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
     ++startIndex;
     isSendable = true;
   }
+  bool isOneway = false;
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::OnewayFunctionType) {
+    ++startIndex;
+    isOneway = true;
+  }
   if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
     ++startIndex;
     isAsync = true;
@@ -959,6 +966,9 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
 
   if (isSendable)
     Printer << "@Sendable ";
+
+  if (isOneway)
+    Printer << "@oneway ";
 
   printFunctionParameters(LabelList, node->getChild(argIndex), depth,
                           Options.ShowFunctionArgumentTypes);
@@ -1407,6 +1417,12 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::CalledOnceFunctionType:
     case Node::Kind::CalledAtMostOnceFunctionType:
+      // A '@oneway' function type starts with its attribute, which is
+      // separated from a preceding entity name, e.g. 'f @oneway () -> ()'
+      for (auto child : *Type)
+        if (child->getKind() == Node::Kind::OnewayFunctionType)
+          return true;
+      return false;
     case Node::Kind::DependentGenericType:
       return false;
     default:
@@ -3208,6 +3224,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer << " async";
+    return nullptr;
+  case Node::Kind::OnewayFunctionType:
+    Printer << "@oneway ";
     return nullptr;
   case Node::Kind::ThrowsAnnotation:
     Printer << " throws";

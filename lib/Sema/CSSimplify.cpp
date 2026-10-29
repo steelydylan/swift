@@ -3325,6 +3325,22 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
+  // A '@oneway' function must be called with 'send'. A function type
+  // which is not '@oneway' can be called without, so a
+  // '@oneway' function cannot be converted to it, but any function
+  // can be converted to a '@oneway' function type
+  if (func1->isOneway() != func2->isOneway()) {
+    if (func1->isOneway() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      auto *fix = IgnoreOnewayMismatch::create(*this, func1, func2,
+                                               getConstraintLocator(locator));
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    }
+  }
+
   auto execResult = matchFunctionExecutionSemantics(
       func1, func2, kind, TMF_GenerateConstraints,
       locator.withPathElement(ConstraintLocator::FunctionExecutionSemantics));
@@ -16510,6 +16526,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::IgnoreOnewayMismatch:
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:

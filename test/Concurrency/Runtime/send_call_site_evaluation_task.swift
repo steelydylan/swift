@@ -95,7 +95,7 @@ func argument(_ value: Int) -> Int {
     // CHECK-NEXT: after nil send
 
     // A function value is read at the call site
-    var handler: @MainActor (Int) -> Void = { value in
+    var handler: @oneway @MainActor (Int) -> Void = { value in
       print("first handler \(value)")
     }
     send handler(argument(3))

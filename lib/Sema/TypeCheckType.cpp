@@ -3468,6 +3468,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::Callable:
     return TAR_ExecutionSemantics;
 
+
   // These are total transforms on the type, and one of them can apply
   // at once.
   case TypeAttrKind::Opened:
@@ -3651,6 +3652,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::Once,
       TypeAttrKind::Callable,
       TypeAttrKind::ScopeParams,
+      TypeAttrKind::Oneway,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -5382,6 +5384,41 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  // A '@oneway' function must be called with 'send', which discards
+  // the result and has no caller to receive an error, so the function type
+  // must return 'Void' and must not throw ('throws(Never)' does not throw).
+  //
+  // A 'send' call is enqueued on the callee's actor, so the function type must
+  // also be isolated to an actor, either to a global actor or through an
+  // 'isolated' parameter, just like a '@oneway' declaration. A nonisolated,
+  // 'nonisolated(nonsending)' or '@concurrent' function type is not. Neither
+  // is an '@isolated(any)' function type, which may be dynamically nonisolated
+  bool oneway = false;
+  if (auto *sendAttr = claim<OnewayTypeAttr>(attrs)) {
+    if (!ctx.LangOpts.hasFeature(Feature::SendCalls)) {
+      diagnoseInvalid(repr, sendAttr->getAttrLoc(),
+                      diag::requires_experimental_feature, "@oneway",
+                      false, Feature::SendCalls.getName());
+    } else if (representation != FunctionTypeRepresentation::Swift &&
+               conventionAttr) {
+      diagnoseInvalid(repr, sendAttr->getAttrLoc(),
+                      diag::oneway_function_type_convention,
+                      conventionAttr->getConventionName());
+    } else if (!outputTy->hasError() &&
+               (!outputTy->isVoid() ||
+                (repr->isThrowing() &&
+                 !(thrownTy && thrownTy->isNever())))) {
+      diagnoseInvalid(repr, sendAttr->getAttrLoc(),
+                      diag::oneway_function_type_invalid);
+    } else if (isolation.getKind() != FunctionTypeIsolation::Kind::GlobalActor &&
+               isolation.getKind() != FunctionTypeIsolation::Kind::Parameter) {
+      diagnoseInvalid(repr, sendAttr->getAttrLoc(),
+                      diag::oneway_function_type_requires_actor_isolation);
+    } else {
+      oneway = true;
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
@@ -5397,6 +5434,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
                      .withCoroutine(coroutine)
+                     .withOneway(oneway)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.

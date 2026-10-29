@@ -2353,6 +2353,10 @@ namespace {
     SmallVector<llvm::PointerUnion<ApplyExpr *, LookupExpr *>, 4> applyStack;
     SmallVector<std::pair<OpaqueValueExpr *, Expr *>, 4> opaqueValues;
     SmallVector<const PatternBindingDecl *, 2> patternBindingStack;
+    /// The explicit 'await' expressions that are being walked, innermost
+    /// last. A closure or local function starts a new context, which a
+    /// null entry separates from the 'await's around it
+    SmallVector<AwaitExpr *, 2> awaitStack;
     llvm::function_ref<Type(Expr *)> getType;
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation;
@@ -3195,6 +3199,7 @@ namespace {
       // an isolation requirement unsatisfied by the calling context, so
       // set the unsatisfiedIsolationJump fields of the ApplyExpr appropriately
       apply->setIsolationCrossing(getContextIsolation(), *unsatisfiedIsolation);
+      diagnoseAwaitedOnewayCall(apply);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
@@ -3234,6 +3239,7 @@ namespace {
         }
 
         contextStack.push_back(func);
+        awaitStack.push_back(nullptr);
       }
 
       if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
@@ -3247,6 +3253,8 @@ namespace {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         assert(contextStack.back() == func);
         contextStack.pop_back();
+        assert(!awaitStack.empty() && awaitStack.back() == nullptr);
+        awaitStack.pop_back();
       }
 
       if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
@@ -3281,6 +3289,10 @@ namespace {
             openExistential->getExistentialValue()});
         return Action::Continue(expr);
       }
+
+      if (auto *await = dyn_cast<AwaitExpr>(expr))
+        if (!await->isImplicit())
+          awaitStack.push_back(await);
 
       auto determineClosureIsolationInContext =
           [&](AbstractClosureExpr *closure, Expr *context) {
@@ -3338,6 +3350,7 @@ namespace {
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
+        awaitStack.push_back(nullptr);
         return Action::Continue(expr);
       }
 
@@ -3493,6 +3506,15 @@ namespace {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         assert(contextStack.back() == closure);
         contextStack.pop_back();
+        assert(!awaitStack.empty() && awaitStack.back() == nullptr);
+        awaitStack.pop_back();
+      }
+
+      if (auto *await = dyn_cast<AwaitExpr>(expr)) {
+        if (!await->isImplicit()) {
+          assert(awaitStack.back() == await);
+          awaitStack.pop_back();
+        }
       }
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
@@ -4053,6 +4075,37 @@ namespace {
       return result;
     }
 
+    /// A '@oneway' function is intended to be called with 'send',
+    /// without waiting for it. Warn about an explicit 'await' of a call of
+    /// it which crosses into another isolation domain, which waits for it. A
+    /// call from within the function's own isolation domain is an ordinary
+    /// call, and a 'send' call is only implicitly awaited, in the operation
+    /// closure of the 'send'. A value of a '@oneway' function type,
+    /// like a closure stored in a variable, is checked by its type
+    void diagnoseAwaitedOnewayCall(ApplyExpr *apply) {
+      if (!ctx.LangOpts.hasFeature(Feature::SendCalls) ||
+          isa<SelfApplyExpr>(apply) || apply->isImplicit() ||
+          apply->isOnewaySendOperand())
+        return;
+      if (awaitStack.empty() || !awaitStack.back())
+        return;
+
+      auto *callee = dyn_cast_or_null<FuncDecl>(
+          apply->getCalledValue(/*skipFunctionConversions=*/true));
+      Type fnTy = getType(apply->getFn());
+      auto *anyFnTy = fnTy ? fnTy->getAs<AnyFunctionType>() : nullptr;
+      if (!(callee && callee->isOneway()) &&
+          !(anyFnTy && anyFnTy->isOneway()))
+        return;
+
+      AwaitExpr *await = awaitStack.back();
+      auto diag = ctx.Diags.diagnose(apply->getLoc(),
+                                     diag::await_on_oneway_function,
+                                     callee != nullptr, callee);
+      if (anyFnTy && anyFnTy->getResult()->isVoid())
+        diag.fixItReplace(await->getAwaitLoc(), "send");
+    }
+
     /// Check actor isolation for a particular application.
     bool checkApply(ApplyExpr *apply) {
       auto fnExprType = getType(apply->getFn());
@@ -4249,6 +4302,7 @@ namespace {
       // an isolation requirement unsatisfied by the calling context, so
       // set the unsatisfiedIsolationJump fields of the ApplyExpr appropriately
       apply->setIsolationCrossing(getContextIsolation(), *unsatisfiedIsolation);
+      diagnoseAwaitedOnewayCall(apply);
 
       bool requiresAsync =
           callOptions.contains(ActorReferenceResult::Flags::AsyncPromotion);

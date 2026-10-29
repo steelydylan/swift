@@ -628,6 +628,16 @@ Type ASTBuilder::createFunctionType(
   return FunctionType::get(funcParams, /* yields */ {}, output, einfo);
 }
 
+Type ASTBuilder::createOnewayFunctionType(Type functionType) {
+  auto *fnType = functionType->getAs<FunctionType>();
+  if (!fnType)
+    return Type();
+
+  return FunctionType::get(
+      fnType->getParams(), fnType->getYields(), fnType->getResult(),
+      fnType->getExtInfo().withOneway());
+}
+
 static ParameterConvention
 getParameterConvention(ImplParameterConvention conv) {
   switch (conv) {

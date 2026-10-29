@@ -392,6 +392,10 @@ enum class FixKind : uint8_t {
   /// `async` attribute from the source function.
   DropAsyncAttribute,
 
+  /// Ignore a conversion between function types of which only one is
+  /// '@oneway', like a '@oneway' function to a plain function type
+  IgnoreOnewayMismatch,
+
   /// Allow invalid pointer conversions for autoclosure result types as if the
   /// pointer type is a function parameter rather than an autoclosure result.
   AllowAutoClosurePointerConversion,
@@ -1145,6 +1149,32 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DropAsyncAttribute;
+  }
+};
+
+/// Ignore a conversion between function types of which only one is
+/// '@oneway': a '@oneway' function must be called with 'send', so it cannot be
+/// converted to a function type which can be called without
+class IgnoreOnewayMismatch final : public ContextualMismatch {
+  IgnoreOnewayMismatch(ConstraintSystem &cs, FunctionType *fromType,
+                         FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::IgnoreOnewayMismatch, fromType,
+                           toType, locator) {
+    assert(fromType->isOneway() != toType->isOneway());
+  }
+
+public:
+  std::string getName() const override { return "ignore '@oneway' mismatch"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreOnewayMismatch *create(ConstraintSystem &cs,
+                                        FunctionType *fromType,
+                                        FunctionType *toType,
+                                        ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreOnewayMismatch;
   }
 };
 

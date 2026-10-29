@@ -965,7 +965,23 @@ DECL_ATTR(_scopeParams, ScopeParams,
   182)
 DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
 
-LAST_DECL_ATTR(ScopeParams)
+SIMPLE_DECL_ATTR(oneway, Oneway,
+  OnFunc,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  183)
+DECL_ATTR_FEATURE_REQUIREMENT(Oneway, SendCalls)
+
+// '@oneway(never)'. It is spelled in source as '@oneway' with a 'never'
+// argument, which the parser dispatches on, and it prints with that spelling,
+// see DeclAttribute::getAttrName(). It only affects the diagnostics at call
+// sites, not the function type, so it is ABI and API stable to add or remove
+SIMPLE_DECL_ATTR(_onewayNever, OnewayNever,
+  OnFunc,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  184)
+DECL_ATTR_FEATURE_REQUIREMENT(OnewayNever, SendCalls)
+
+LAST_DECL_ATTR(OnewayNever)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

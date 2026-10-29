@@ -644,6 +644,46 @@ static bool usesFeatureSendCalls(Decl *decl) {
     return finder.found;
   };
 
+  // The '@oneway' attribute, on declarations and on function types,
+  // and the '@oneway(never)' attribute are gated on this feature
+  if (decl->getAttrs().hasAttribute<OnewayAttr>() ||
+      decl->getAttrs().hasAttribute<OnewayNeverAttr>())
+    return true;
+
+  auto isOnewayFunctionType = [](Type type) {
+    if (auto *fnTy = dyn_cast<AnyFunctionType>(type.getPointer()))
+      return fnTy->isOneway();
+    return false;
+  };
+
+  if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+    if (auto type = typeAlias->getUnderlyingType())
+      return type.findIf(isOnewayFunctionType);
+    return false;
+  }
+
+  // Look at the variables of a pattern binding without type-checking it,
+  // which a deserialized one cannot be
+  if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    for (unsigned i = 0, n = pbd->getNumPatternEntries(); i != n; ++i) {
+      auto *pattern = pbd->getPattern(i);
+      if (!pattern)
+        continue;
+
+      bool usesOneway = false;
+      pattern->forEachVariable([&](VarDecl *var) {
+        usesOneway |= usesTypeMatching(var, isOnewayFunctionType);
+      });
+      if (usesOneway)
+        return true;
+    }
+    return false;
+  }
+
+  if (usesTypeMatching(decl, isOnewayFunctionType))
+    return true;
+
+  // An inlinable body which uses 'send' is printed into the interface
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
     return hasInlinableSendCall(afd);
   if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))

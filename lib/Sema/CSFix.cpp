@@ -1811,6 +1811,21 @@ DropAsyncAttribute *DropAsyncAttribute::create(ConstraintSystem &cs,
       DropAsyncAttribute(cs, fromType, toType, locator);
 }
 
+bool IgnoreOnewayMismatch::diagnose(const Solution &solution,
+                                   bool asNote) const {
+  OnewayFunctionConversionFailure failure(solution, getFromType(),
+                                            getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreOnewayMismatch *
+IgnoreOnewayMismatch::create(ConstraintSystem &cs, FunctionType *fromType,
+                               FunctionType *toType,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreOnewayMismatch(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(const Solution &solution,
                                     bool asNote) const {
   ContextualFailure failure(solution, getFromType(), getToType(), getLocator());

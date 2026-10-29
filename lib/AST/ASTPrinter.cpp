@@ -7321,6 +7321,11 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    if (!Options.excludeAttrKind(TypeAttrKind::Oneway) &&
+        info.isOneway()) {
+      Printer.printSimpleAttr("@oneway") << " ";
+    }
+
     if (auto semantics = info.getExecutionSemantics()) {
       if (!Options.excludeAttrKind(*semantics == ExecutionSemantics::Once
                                        ? TypeAttrKind::Once

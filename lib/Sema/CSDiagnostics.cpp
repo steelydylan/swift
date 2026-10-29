@@ -7653,6 +7653,17 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool OnewayFunctionConversionFailure::diagnoseAsError() {
+  auto fromTy = getFromType();
+  auto toTy = getToType();
+  bool fromIsSend = false;
+  if (auto *fnTy = fromTy->getAs<AnyFunctionType>())
+    fromIsSend = fnTy->isOneway();
+  emitDiagnostic(diag::oneway_function_conversion, fromTy, toTy,
+                 /*toSend=*/!fromIsSend);
+  return true;
+}
+
 bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     diagnoseAsError() {
   auto getSemantics = [](Type type) -> std::optional<ExecutionSemantics> {

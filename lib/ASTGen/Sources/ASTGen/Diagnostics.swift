@@ -193,6 +193,20 @@ extension ASTGenDiagnostic {
     )
   }
 
+  static func expectedNeverInOnewayAttribute(_ node: some SyntaxProtocol) -> Self {
+    Self(
+      node: node,
+      message: "expected 'never' in '@oneway' attribute"
+    )
+  }
+
+  static func onewayNeverOnType(_ node: AttributeSyntax) -> Self {
+    Self(
+      node: node.attributeName,
+      message: "'@oneway(never)' is only allowed on declarations, not on function types"
+    )
+  }
+
   static func expectedStringLiteralArgument(_ node: some SyntaxProtocol) -> Self {
     Self(
       node: node,

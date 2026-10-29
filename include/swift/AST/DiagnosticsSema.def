@@ -6804,6 +6804,32 @@ ERROR(distributed_witness_typed_throws_requirement,none,
       "method can throw any error",
       (const ValueDecl *, const ValueDecl *, Type))
 
+ERROR(oneway_requires_void_result,none,
+      "'@oneway' %kind0 must return 'Void'",
+      (const ValueDecl *))
+ERROR(oneway_requires_nonthrowing,none,
+      "'@oneway' %kind0 must not throw",
+      (const ValueDecl *))
+ERROR(oneway_requires_actor_isolation,none,
+      "'@oneway' can only be applied to an actor isolated method", ())
+ERROR(oneway_function_type_invalid,none,
+      "'@oneway' function type must return 'Void' and must not throw",
+      ())
+ERROR(oneway_function_type_requires_actor_isolation,none,
+      "'@oneway' function type must be isolated to an actor", ())
+ERROR(oneway_function_type_convention,none,
+      "'@oneway' cannot be used with '@convention(%0)'", (StringRef))
+ERROR(oneway_function_conversion,none,
+      "%select{cannot convert '@oneway' function of type %0 to %1, "
+      "which can be called without 'send'|"
+      "cannot convert function of type %0 to '@oneway' function type "
+      "%1 in this context}2",
+      (Type, Type, bool))
+
+ERROR(oneway_distributed_not_supported,none,
+      "'@oneway' is not supported on %kind0 yet",
+      (const ValueDecl *))
+
 ERROR(send_requires_call,none,
       "'send' can only be applied to a function call", ())
 ERROR(send_requires_actor_isolated_callee,none,
@@ -6844,6 +6870,14 @@ ERROR(send_only_version_newer,none,
 ERROR(send_distributed_not_supported,none,
       "'send' of %kind0 is not supported yet",
       (const ValueDecl *))
+GROUPED_WARNING(await_on_oneway_function,AwaitedOnewayCall,none,
+      "'@oneway' %select{function|%kind1}0 is not intended to be awaited on, "
+      "use 'send' instead",
+      (bool, const ValueDecl *))
+GROUPED_WARNING(oneway_never_call_uses_send,SentOnewayNeverCall,none,
+      "'@oneway(never)' %select{function|%kind1}0 is not intended to be called "
+      "with 'send', use 'await' instead",
+      (bool, const ValueDecl *))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

@@ -1741,6 +1741,12 @@ namespace  {
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(Once)
+    // '@oneway' is part of the function type, which an override must
+    // match exactly, so an override can neither add nor drop it
+    UNINTERESTING_ATTR(Oneway)
+    // An override of a '@oneway(never)' method is treated as
+    // '@oneway(never)' too, see FuncDecl::isOnewayNever()
+    UNINTERESTING_ATTR(OnewayNever)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)

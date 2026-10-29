@@ -99,6 +99,9 @@ extension ASTGenVisitor {
       case .Callable:
         return (self.generateCallableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .Oneway:
+        return self.generateOnewayTypeAttr(attribute: node)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       case .Scoped:
         return (self.generateScopedTypeAttr(attribute: node)?.asTypeAttribute)
@@ -306,6 +309,20 @@ extension ASTGenVisitor {
       isolationKind: isolationKind,
       isolationKindLoc: isolationKindLoc
     )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @oneway
+  ///   ```
+  /// '@oneway(never)' does not affect the function type, so it is dropped
+  /// after diagnosing it.
+  func generateOnewayTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+    if node.arguments != nil {
+      self.diagnose(.onewayNeverOnType(node))
+      return nil
+    }
+    return self.generateSimpleTypeAttr(attribute: node, kind: .Oneway)
   }
 
   func generateCallableTypeAttr(attribute node: AttributeSyntax) -> BridgedCallableTypeAttr? {

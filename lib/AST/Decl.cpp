@@ -4527,6 +4527,13 @@ bool swift::conflicting(const OverloadSignature& sig1,
       return false;
   } // else, if any of the methods was distributed, continue checking
 
+  // '@oneway' distinguishes overloads: 'func x()' and '@oneway func x()'
+  // are distinct declarations, their function types mangle differently
+  // ('Yo'), and 'send' picks the '@oneway' one while 'await' picks the other
+  // one
+  if (sig1.IsOneway != sig2.IsOneway)
+    return false;
+
   // If one is a macro and the other is not, they can't conflict.
   if (sig1.IsMacro != sig2.IsMacro)
     return false;
@@ -4806,6 +4813,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       signature.IsAsyncFunction = true;
     if (func->isDistributed())
       signature.IsDistributed = true;
+    if (auto *FD = dyn_cast<FuncDecl>(func))
+      signature.IsOneway = FD->isOneway();
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
@@ -12121,6 +12130,19 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                              const_cast<FuncDecl *>(this)
                            },
                            nullptr);
+}
+
+bool FuncDecl::isOnewayNever() const {
+  for (auto *func = this; func;
+       func = dyn_cast_or_null<FuncDecl>(func->getOverriddenDecl())) {
+    if (func->getAttrs().hasAttribute<OnewayNeverAttr>())
+      return true;
+  }
+  return false;
+}
+
+bool FuncDecl::isOneway() const {
+  return getAttrs().hasAttribute<OnewayAttr>();
 }
 
 bool FuncDecl::isStatic() const {

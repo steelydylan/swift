@@ -1010,6 +1010,22 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a conversion between a '@oneway' function type and a function
+/// type which is not '@oneway':
+///
+/// ```swift
+/// @oneway func tick() {}
+/// let fn: () -> Void = tick // error: 'fn()' could be called without 'send'
+/// ```
+class OnewayFunctionConversionFailure final : public ContextualFailure {
+public:
+  OnewayFunctionConversionFailure(const Solution &solution, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between two types with different
 /// execution semantics, such as an at-most-once function and a regular one:
 ///

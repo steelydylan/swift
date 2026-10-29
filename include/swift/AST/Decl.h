@@ -318,6 +318,9 @@ struct OverloadSignature {
   /// Whether this is an distributed function.
   unsigned IsDistributed : 1;
 
+  /// Whether this is a '@oneway' function.
+  unsigned IsOneway : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -346,10 +349,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), IsEnumElement(false), IsNominal(false),
-        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
-        InProtocolExtension(false), InExtensionOfGenericType(false),
-        HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsOneway(false), IsEnumElement(false),
+        IsNominal(false), IsTypeAlias(false), IsMacro(false),
+        IsGenericArg(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -8998,6 +9001,17 @@ public:
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
+
+  /// Whether this function is declared '@oneway': it must be called
+  /// with 'send'. Its function type is '@oneway' too, so that it is a
+  /// distinct overload from an otherwise identical plain function
+  bool isOneway() const;
+
+  /// Whether this function is declared '@oneway(never)', or overrides a
+  /// method which is: a 'send' of a call to it from outside of its isolation
+  /// domain is diagnosed, since it should be called with 'await'. Unlike
+  /// '@oneway', this does not affect the function type
+  bool isOnewayNever() const;
 
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {

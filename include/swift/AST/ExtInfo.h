@@ -642,8 +642,8 @@ class ASTExtInfoBuilder {
   // and NumMaskBits must be updated, and they must match.
   //
   // clang-format off
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|execution_semantics| coroutine |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |      16 .. 17     |    18     |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|execution_semantics| coroutine | oneway |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |      16 .. 17     |    18     |   19   |
   // clang-format on
   //
   enum : unsigned {
@@ -661,7 +661,8 @@ class ASTExtInfoBuilder {
     ExecutionSemanticsMaskOffset = 16,
     ExecutionSemanticsMask = 0x3 << ExecutionSemanticsMaskOffset,
     CoroutineMask = 1 << 18,
-    NumMaskBits = 19
+    OnewayMask = 1 << 19,
+    NumMaskBits = 20
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -785,6 +786,13 @@ public:
 
   constexpr bool isCoroutine() const { return bits & CoroutineMask; }
 
+  /// Whether this is a '@oneway' function type, which must be called
+  /// with 'send'. It comes from the '@oneway' attribute of a function
+  /// declaration or of a function type and participates in the type
+  /// identity, so that a '@oneway' overload is distinct from an otherwise
+  /// identical plain one, mirroring 'async'
+  constexpr bool isOneway() const { return bits & OnewayMask; }
+
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
                                  DifferentiabilityMaskOffset);
@@ -906,6 +914,12 @@ public:
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(
         async ? (bits | AsyncMask) : (bits & ~AsyncMask), clangTypeInfo,
+        globalActor, thrownError, typeDependencies, lifetimeDependencies);
+  }
+  [[nodiscard]]
+  ASTExtInfoBuilder withOneway(bool oneway = true) const {
+    return ASTExtInfoBuilder(
+        oneway ? (bits | OnewayMask) : (bits & ~OnewayMask), clangTypeInfo,
         globalActor, thrownError, typeDependencies, lifetimeDependencies);
   }
   [[nodiscard]]
@@ -1086,6 +1100,8 @@ public:
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
+  constexpr bool isOneway() const { return builder.isOneway(); }
+
   constexpr bool isThrowing() const { return builder.isThrowing(); }
 
   constexpr bool isCoroutine() const { return builder.isCoroutine(); }
@@ -1200,6 +1216,14 @@ public:
   [[nodiscard]] ASTExtInfo withTypeDependency(TypeDependenceKind kind,
                                               Type type) const {
     return builder.withTypeDependency(kind, type).build();
+  }
+
+  /// Helper method for changing only the oneway field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withOneway for chaining
+  [[nodiscard]]
+  ASTExtInfo withOneway(bool oneway = true) const {
+    return builder.withOneway(oneway).build();
   }
 
   [[nodiscard]] ASTExtInfo withSendingResult(bool sending = true) const {

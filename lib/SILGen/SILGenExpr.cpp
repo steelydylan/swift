@@ -7494,9 +7494,9 @@ RValue RValueEmitter::visitDefaultArgumentExpr(DefaultArgumentExpr *E,
                                                SGFContext C) {
   // Default arguments in an argument list are handled specially. Only
   // caller-side default arguments such as magic literals, and the default
-  // arguments which a 'send' call of a synchronous function evaluates at
-  // the call site (see 'lowerSynchronousSend' in CSApply), are emitted as an
-  // rvalue
+  // arguments which a 'send' call of a synchronous 'oneway' function
+  // evaluates at the call site (see 'lowerSynchronousSend' in
+  // CSApply), are emitted as an rvalue
   if (!E->isCallerSide())
     return SGF.emitApplyOfDefaultArgGenerator(
         E, E->getDefaultArgsOwner(), E->getParamIndex(),
