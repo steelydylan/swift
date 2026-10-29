@@ -5553,6 +5553,11 @@ void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitSendExpr(SendExpr *expr) {
+  Printer << "send ";
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitCopyExpr(CopyExpr *expr) {
   Printer << "copy ";
   visit(expr->getSubExpr());
